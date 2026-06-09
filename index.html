@@ -244,7 +244,9 @@
         <button class="primary" id="newBtn">New game</button>
         <button id="flipBtn">Flip</button>
         <button id="playBestBtn">Play best</button>
+        <button id="wildBtn">Wild line</button>
       </div>
+      <div class="depth" id="wildMsg" style="margin-top:6px"></div>
 
       <details class="load">
         <summary>Load / export position</summary>
@@ -272,6 +274,28 @@ const VAL = { p:1, n:3, b:3, r:5, q:9 };
 const START_COUNT = { p:8, n:2, b:2, r:2, q:1 };
 const ARROWS = 3;
 const MAX_MULTIPV = 256;
+
+// Offbeat-but-sound openings: surprising, rarely seen, still winnable.
+// `side` is the colour whose strategy it is; `moves` is the full line in SAN.
+const WILD_BOOK = [
+  { name: "Grob's Attack", side: 'w', moves: ['g4'], note: 'bizarre but trappy' },
+  { name: "Bird's Opening", side: 'w', moves: ['f4'], note: 'reversed Dutch' },
+  { name: 'Sokolsky (Orangutan)', side: 'w', moves: ['b4'], note: 'flank ambush' },
+  { name: 'Nimzo-Larsen Attack', side: 'w', moves: ['b3'], note: 'hypermodern' },
+  { name: "King's Gambit", side: 'w', moves: ['e4', 'e5', 'f4'], note: 'sharp and aggressive' },
+  { name: 'Vienna Gambit', side: 'w', moves: ['e4', 'e5', 'Nc3', 'Nf6', 'f4'], note: 'delayed f4' },
+  { name: 'Danish Gambit', side: 'w', moves: ['e4', 'e5', 'd4', 'exd4', 'c3'], note: 'two pawns for a storm' },
+  { name: 'Halloween Gambit', side: 'w', moves: ['e4', 'e5', 'Nf3', 'Nc6', 'Nc3', 'Nf6', 'Nxe5'], note: 'wild knight sac' },
+  { name: 'Smith-Morra Gambit', side: 'w', moves: ['e4', 'c5', 'd4', 'cxd4', 'c3'], note: 'anti-Sicilian gambit' },
+  { name: 'Scandinavian Defense', side: 'b', moves: ['e4', 'd5'], note: 'instant central strike' },
+  { name: "Alekhine's Defense", side: 'b', moves: ['e4', 'Nf6'], note: 'provoke and counter' },
+  { name: 'Latvian Gambit', side: 'b', moves: ['e4', 'e5', 'Nf3', 'f5'], note: "Black's wild gambit" },
+  { name: 'Englund Gambit', side: 'b', moves: ['d4', 'e5'], note: 'cheeky pawn offer' },
+  { name: 'Budapest Gambit', side: 'b', moves: ['d4', 'Nf6', 'c4', 'e5'], note: 'active piece play' },
+  { name: 'Dutch Defense', side: 'b', moves: ['d4', 'f5'], note: 'kingside ambitions' },
+  { name: 'Modern Defense', side: 'b', moves: ['e4', 'g6'], note: 'hypermodern fianchetto' },
+];
+let activeWild = null;
 const ARROW_COLORS = ['#1e88ff', '#43a047', '#fb8c00'];
 const ARROW_WIDTH = [0.17, 0.13, 0.11];
 const ARROW_OPACITY = [0.9, 0.7, 0.55];
@@ -729,7 +753,8 @@ function applyUci(uci, byEngine) {
 function afterNav() {
   const h = game.history({ verbose: true });
   lastMove = h.length ? { from: h[h.length - 1].from, to: h[h.length - 1].to } : null;
-  selected = null; legalDests = []; hoverUci = null; pendingGrade = null;
+  selected = null; legalDests = []; hoverUci = null; pendingGrade = null; activeWild = null;
+  $('wildMsg').textContent = '';
   render();
   analyse();
   maybeBotMove();
@@ -798,6 +823,48 @@ function resetGrading() {
   $('gradeDetail').textContent = ''; $('gradeStats').textContent = '';
 }
 
+/* ---------- Wild line ---------- */
+function fenKey(g) { return g.fen().split(' ').slice(0, 4).join(' '); }
+function wildMove() {
+  if (game.game_over()) return;
+  const h = game.history().length;
+  const S = game.turn();
+  const candidates = [];
+  for (const L of WILD_BOOK) {
+    if (L.side !== S || L.moves.length <= h) continue;
+    const tmp = new Chess();
+    let ok = true;
+    for (let i = 0; i < h; i++) { if (!tmp.move(L.moves[i])) { ok = false; break; } }
+    if (!ok || fenKey(tmp) !== fenKey(game)) continue;
+    const test = tmp.move(L.moves[h]);                 // next move legal here?
+    if (!test) continue;
+    candidates.push({ L, from: test.from, to: test.to, promotion: test.promotion, san: test.san });
+  }
+  let pick = candidates.find(c => c.L === activeWild) || candidates[Math.floor(Math.random() * candidates.length)];
+  if (pick) {
+    activeWild = pick.L;
+    $('wildMsg').textContent = 'Wild line: ' + pick.L.name + ' (' + pick.san + ')' + (pick.L.note ? ' - ' + pick.L.note : '');
+    doMove({ from: pick.from, to: pick.to, promotion: pick.promotion }, true);
+    return;
+  }
+  engineSurprise();   // out of book: a sound but offbeat engine move
+}
+function engineSurprise() {
+  const arr = Object.keys(curLines).map(k => curLines[k]).filter(Boolean);
+  if (!arr.length) { if (bestUci) { $('wildMsg').textContent = 'Off-book: playing the engine pick'; applyUci(bestUci, true); } return; }
+  const sign = game.turn() === 'w' ? 1 : -1;
+  const moverCp = l => sign * l.cp;
+  const best = Math.max(...arr.map(moverCp));
+  const margin = 70;
+  const pool = arr.filter(l => best - moverCp(l) <= margin);
+  const topUci = curLines[1] ? curLines[1].firstUci : null;
+  const nonTop = pool.filter(l => l.firstUci !== topUci);
+  const from = nonTop.length ? nonTop : pool;
+  const choice = from[Math.floor(Math.random() * from.length)];
+  $('wildMsg').textContent = nonTop.length ? 'Off-book surprise: a sound sideline (within ' + margin + 'cp)' : 'Off-book: no safe surprise here, playing best';
+  applyUci(choice.firstUci, true);
+}
+
 /* ---------- Sound (synthesized, no files) ---------- */
 let actx = null;
 function blip(freq, dur, type, gain) {
@@ -848,6 +915,7 @@ function reset(fn) { fn(); future = []; resetGrading(); afterNav(); }
 $('newBtn').addEventListener('click', () => reset(() => game.reset()));
 $('flipBtn').addEventListener('click', () => { orientation = orientation === 'w' ? 'b' : 'w'; render(); });
 $('playBestBtn').addEventListener('click', () => { if (bestUci) applyUci(bestUci, false); });
+$('wildBtn').addEventListener('click', wildMove);
 $('startBtn').addEventListener('click', goStart);
 $('backBtn').addEventListener('click', goBack);
 $('fwdBtn').addEventListener('click', goForward);
