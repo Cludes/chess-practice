@@ -11,7 +11,6 @@
     --sel: rgba(255, 235, 59, 0.55);
     --dest: rgba(0, 0, 0, 0.22);
     --last: rgba(255, 235, 59, 0.30);
-    --best: rgba(56, 142, 255, 0.40);
     --bg: #2b2b2b;
     --panel: #363636;
     --text: #e8e8e8;
@@ -58,30 +57,44 @@
   .sq.d { background: var(--dark); }
   .sq.sel::after { content: ""; position: absolute; inset: 0; background: var(--sel); }
   .sq.last::after { content: ""; position: absolute; inset: 0; background: var(--last); }
-  .sq.best::after { content: ""; position: absolute; inset: 0; background: var(--best); }
   .piece {
-    font-size: min(9vw, 64px); line-height: 1; z-index: 2; pointer-events: none;
+    font-size: min(9vw, 64px); line-height: 1; z-index: 2;
   }
   .piece.w { color: #fff; text-shadow: 0 0 2px #000, 0 1px 2px rgba(0,0,0,.6); }
   .piece.b { color: #1b1b1b; text-shadow: 0 0 1px rgba(255,255,255,.25); }
+  .piece.drag { cursor: grab; }
   .dot { position: absolute; width: 28%; height: 28%; border-radius: 50%;
-    background: var(--dest); z-index: 1; }
+    background: var(--dest); z-index: 1; pointer-events: none; }
   .dot.capture { width: 86%; height: 86%; background: transparent;
     border: 6px solid var(--dest); border-radius: 50%; }
-  .coord { position: absolute; font-size: 10px; font-weight: 700; opacity: .65; z-index: 3; }
+  .coord { position: absolute; font-size: 10px; font-weight: 700; opacity: .65; z-index: 3; pointer-events: none; }
   .coord.file { bottom: 1px; right: 3px; }
   .coord.rank { top: 1px; left: 3px; }
   svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
 
   .panel { background: var(--panel); border-radius: 10px; padding: 14px 16px;
-    width: 300px; max-width: 90vw; }
-  .evalline { font-size: 28px; font-weight: 800; margin: 0 0 2px; }
-  .bestmove { font-size: 15px; color: var(--accent); font-weight: 700; min-height: 20px; }
+    width: 312px; max-width: 92vw; }
+  .evalline { font-size: 28px; font-weight: 800; margin: 0 0 6px; }
+
+  .cands { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; max-height: 220px; overflow-y: auto; }
+  .cand { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .cand .rank { color: var(--muted); font-size: 11px; min-width: 18px; text-align: right; }
+  .cand .swatch { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .cand .mv { font-weight: 700; min-width: 56px; }
+  .cand .ev { color: var(--muted); font-size: 12px; }
+
   .pv { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
-    color: var(--muted); margin: 8px 0 0; line-height: 1.5; word-spacing: 2px; }
+    color: var(--muted); margin: 2px 0 0; line-height: 1.5; word-spacing: 2px; }
   .status { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
   .turn { font-size: 13px; margin-top: 10px; }
   .turn b { color: #fff; }
+
+  .gradebox { margin-top: 12px; padding: 10px; border-radius: 8px; background: #2f2f2f;
+    display: none; }
+  .gradebox.show { display: block; }
+  .grade-last { font-size: 16px; font-weight: 800; }
+  .grade-detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .grade-stats { font-size: 11px; color: var(--muted); margin-top: 7px; border-top: 1px solid #444; padding-top: 6px; }
 
   .controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
   button {
@@ -94,13 +107,19 @@
   .opt input[type=range] { flex: 1; }
   .checks { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 12px; }
   .checks label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .checks select { background: #4a4a4a; color: var(--text); border: 1px solid #5a5a5a; border-radius: 5px; padding: 3px 5px; }
 
-  .moves { margin-top: 12px; max-height: 150px; overflow-y: auto; font-size: 12px;
+  .load { margin-top: 12px; }
+  .load textarea { width: 100%; height: 54px; resize: vertical; background: #2f2f2f; color: var(--text);
+    border: 1px solid #555; border-radius: 6px; padding: 6px; font-size: 11px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .load-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .load-status { font-size: 11px; color: var(--muted); margin-top: 5px; min-height: 14px; }
+
+  .moves { margin-top: 12px; max-height: 130px; overflow-y: auto; font-size: 12px;
     font-family: ui-monospace, Menlo, Consolas, monospace; line-height: 1.7; color: #cfd2d6; }
-  .moves .mv { cursor: default; }
   .moves .num { color: var(--muted); margin-right: 4px; }
 
-  /* promotion picker */
   .promo { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 10;
     display: none; align-items: center; justify-content: center; }
   .promo.show { display: flex; }
@@ -112,7 +131,7 @@
 <body>
 <div>
   <h1>Chess Practice - Best Move Trainer</h1>
-  <div class="sub">Make moves for both sides. After every move the engine shows the best reply. Runs fully in your browser.</div>
+  <div class="sub">Drag or click to move both sides. The engine ranks every legal move (top three get arrows); turn on grading to score yours. Runs fully in your browser.</div>
 
   <div class="app">
     <div class="board-wrap">
@@ -121,9 +140,9 @@
         <div class="grid" id="grid"></div>
         <svg class="arrows" id="arrows" viewBox="0 0 8 8" preserveAspectRatio="none">
           <defs>
-            <marker id="ah" markerWidth="3.2" markerHeight="3.2" refX="1.6" refY="1.6" orient="auto">
-              <path d="M0,0 L3.2,1.6 L0,3.2 L1,1.6 Z" fill="#388eff"></path>
-            </marker>
+            <marker id="ah0" markerWidth="3.2" markerHeight="3.2" refX="1.6" refY="1.6" orient="auto"><path d="M0,0 L3.2,1.6 L0,3.2 L1,1.6 Z" fill="#1e88ff"></path></marker>
+            <marker id="ah1" markerWidth="3.2" markerHeight="3.2" refX="1.6" refY="1.6" orient="auto"><path d="M0,0 L3.2,1.6 L0,3.2 L1,1.6 Z" fill="#43a047"></path></marker>
+            <marker id="ah2" markerWidth="3.2" markerHeight="3.2" refX="1.6" refY="1.6" orient="auto"><path d="M0,0 L3.2,1.6 L0,3.2 L1,1.6 Z" fill="#fb8c00"></path></marker>
           </defs>
         </svg>
         <div class="promo" id="promo"><div class="promo-inner" id="promoInner"></div></div>
@@ -132,10 +151,17 @@
 
     <div class="panel">
       <div class="evalline" id="evalLine">0.0</div>
-      <div class="bestmove" id="bestMove">Engine starting...</div>
+      <div class="cands" id="cands"></div>
       <div class="pv" id="pv"></div>
+
+      <div class="gradebox" id="gradeBox">
+        <div class="grade-last" id="gradeLast">Make a move...</div>
+        <div class="grade-detail" id="gradeDetail"></div>
+        <div class="grade-stats" id="gradeStats"></div>
+      </div>
+
       <div class="turn" id="turnInfo">White to move</div>
-      <div class="status" id="status"></div>
+      <div class="status" id="status">Engine starting...</div>
 
       <div class="opt">
         <span>Think</span>
@@ -144,7 +170,15 @@
       </div>
 
       <div class="checks">
-        <label><input type="checkbox" id="showArrow" checked /> Show best-move arrow</label>
+        <label><input type="checkbox" id="showArrow" checked /> Show candidate arrows</label>
+        <label>Grade my moves:
+          <select id="gradeSel">
+            <option value="off">Off</option>
+            <option value="w">White</option>
+            <option value="b">Black</option>
+            <option value="both">Both</option>
+          </select>
+        </label>
         <label><input type="checkbox" id="engW" /> Engine plays White</label>
         <label><input type="checkbox" id="engB" /> Engine plays Black</label>
       </div>
@@ -154,6 +188,16 @@
         <button id="undoBtn">Undo</button>
         <button id="flipBtn">Flip</button>
         <button id="playBestBtn">Play best</button>
+      </div>
+
+      <div class="load">
+        <textarea id="loadInput" placeholder="Paste a FEN or a full PGN here..."></textarea>
+        <div class="load-row">
+          <button id="loadFenBtn">Load FEN</button>
+          <button id="loadPgnBtn">Load PGN</button>
+          <button id="copyFenBtn">Copy FEN</button>
+        </div>
+        <div class="load-status" id="loadStatus"></div>
       </div>
 
       <div class="moves" id="moves"></div>
@@ -166,15 +210,28 @@ import { Chess } from './vendor/chess.js';
 
 const FILES = ['a','b','c','d','e','f','g','h'];
 const GLYPH = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛', k:'♚' };
+const ARROWS = 3;              // how many top moves get an on-board arrow
+const MAX_MULTIPV = 256;       // engine ranks every legal move (capped for safety)
+const ARROW_COLORS = ['#1e88ff', '#43a047', '#fb8c00'];
+const ARROW_WIDTH = [0.17, 0.13, 0.11];
+const ARROW_OPACITY = [0.9, 0.7, 0.55];
 
 const game = new Chess();
-let orientation = 'w';     // side at the bottom
-let selected = null;       // selected square e.g. 'e2'
-let legalDests = [];       // [{to, capture}]
-let lastMove = null;       // {from,to}
-let bestUci = null;        // best move in uci for arrow
-let pendingFen = null;     // fen we last asked the engine to analyse
-let pendingPromo = null;   // {from,to} awaiting promotion choice
+let orientation = 'w';
+let selected = null;
+let legalDests = [];
+let lastMove = null;
+let dragFrom = null;
+let pendingFen = null;
+let pendingPromo = null;       // {from,to} or {from,to,byEngine}
+
+let curLines = {};             // multipv index -> info object (live)
+let bestUci = null;            // best move (multipv 1) for arrows / play-best
+let curEval = null;            // finalized analysis: {fen, whiteCp, bestUci, lines}
+
+let gradeMode = 'off';         // off | w | b | both
+let pendingGrade = null;       // {fenBefore, mover, playedUci, pre}
+let gradeStats = { n: 0, totalLoss: 0, best: 0 };
 
 const $ = id => document.getElementById(id);
 const grid = $('grid'), arrows = $('arrows');
@@ -191,72 +248,74 @@ engine.onmessage = (e) => {
 
   if (line.startsWith('info') && line.includes(' pv ')) {
     const info = parseInfo(line);
-    if (info) showEval(info.scoreText, info.cp, info.pvSan, info.firstUci, false);
+    if (info) { curLines[info.mpv] = info; refreshAnalysisUI(); }
     return;
   }
-  if (line.startsWith('bestmove')) {
-    const uci = line.split(' ')[1];
-    onBestMove(uci);
-  }
+  if (line.startsWith('bestmove')) onBestMove(line.split(' ')[1]);
 };
 engine.postMessage('uci');
 
 function analyse() {
   if (!engineReady) return;
+  curLines = {};
   bestUci = null;
   drawArrows();
   if (game.game_over()) { showGameOver(); return; }
   pendingFen = game.fen();
   $('status').textContent = 'Thinking...';
+  const legalCount = game.moves().length;     // rank every legal move this position
   engine.postMessage('stop');
+  engine.postMessage('setoption name MultiPV value ' + Math.min(legalCount, MAX_MULTIPV));
   engine.postMessage('position fen ' + pendingFen);
   engine.postMessage('go movetime ' + thinkMs);
 }
 
 function onBestMove(uci) {
-  // ignore a result for a position we have already moved on from
-  if (pendingFen !== game.fen()) return;
+  if (pendingFen !== game.fen()) return;      // stale result, we already moved on
   $('status').textContent = '';
-  if (!uci || uci === '(none)') return;
-  bestUci = uci;
-  const san = uciToSan(game.fen(), uci);
-  $('bestMove').textContent = san ? ('Best: ' + san) : '';
-  drawArrows();
+  const l1 = curLines[1];
+  bestUci = l1 ? l1.firstUci : (uci && uci !== '(none)' ? uci : null);
+  curEval = { fen: pendingFen, whiteCp: l1 ? l1.cp : 0, bestUci, lines: { ...curLines } };
+  refreshAnalysisUI();
+  resolvePendingGrade();
 
-  // optional: let the engine play this side
   const turn = game.turn();
-  if ((turn === 'w' && $('engW').checked) || (turn === 'b' && $('engB').checked)) {
-    applyUci(uci);
+  if (bestUci && ((turn === 'w' && $('engW').checked) || (turn === 'b' && $('engB').checked))) {
+    applyUci(bestUci, true);
   }
 }
 
 function parseInfo(line) {
   const t = line.split(/\s+/);
-  let cp = null, mate = null, pvIdx = t.indexOf('pv');
-  const si = t.indexOf('score');
-  if (si !== -1) {
-    if (t[si+1] === 'cp') cp = parseInt(t[si+2], 10);
-    else if (t[si+1] === 'mate') mate = parseInt(t[si+2], 10);
-  }
+  const mpvIdx = t.indexOf('multipv');
+  const mpv = mpvIdx !== -1 ? parseInt(t[mpvIdx + 1], 10) : 1;
+  const pvIdx = t.indexOf('pv');
   if (pvIdx === -1) return null;
   const pvUci = t.slice(pvIdx + 1);
-  // score is from side-to-move perspective -> convert to White's perspective
-  const sign = game.turn() === 'w' ? 1 : -1;
+  if (!pvUci.length || !uciToSan(game.fen(), pvUci[0])) return null;   // illegal -> stale, ignore
+
+  let cp = null, mate = null;
+  const si = t.indexOf('score');
+  if (si !== -1) {
+    if (t[si + 1] === 'cp') cp = parseInt(t[si + 2], 10);
+    else if (t[si + 1] === 'mate') mate = parseInt(t[si + 2], 10);
+  }
+  const sign = game.turn() === 'w' ? 1 : -1;   // score is side-to-move relative
   let scoreText, whiteCp;
   if (mate !== null) {
     const m = sign * mate;
     scoreText = (m > 0 ? '+' : '-') + 'M' + Math.abs(mate);
-    whiteCp = m > 0 ? 100000 : -100000;
+    whiteCp = m > 0 ? 100000 - Math.abs(mate) : -100000 + Math.abs(mate);
   } else {
     whiteCp = sign * cp;
     scoreText = (whiteCp >= 0 ? '+' : '') + (whiteCp / 100).toFixed(2);
   }
-  return { cp: whiteCp, scoreText, pvSan: pvToSan(game.fen(), pvUci, 8), firstUci: pvUci[0] };
+  return { mpv, cp: whiteCp, scoreText, firstUci: pvUci[0], firstSan: uciToSan(game.fen(), pvUci[0]), pvSan: pvToSan(game.fen(), pvUci, 8) };
 }
 
-/* ---------- Conversions (uci <-> san) ---------- */
+/* ---------- uci <-> san ---------- */
 function applyUciOn(tmp, uci) {
-  return tmp.move({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci.length > 4 ? uci[4] : undefined });
+  return tmp.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci.length > 4 ? uci[4] : undefined });
 }
 function uciToSan(fen, uci) {
   const tmp = new Chess(fen);
@@ -278,14 +337,35 @@ function pvToSan(fen, pvUci, max) {
   return out.join(' ');
 }
 
-/* ---------- Eval display ---------- */
-function showEval(scoreText, whiteCp, pvSan, firstUci, isFinal) {
-  $('evalLine').textContent = scoreText;
-  $('evalNum').textContent = scoreText;
-  $('pv').textContent = pvSan || '';
-  const clamped = Math.max(-1000, Math.min(1000, whiteCp));
-  const pct = 50 + (clamped / 1000) * 50;
-  $('evalFill').style.height = pct + '%';
+/* ---------- Analysis UI ---------- */
+function refreshAnalysisUI() {
+  const l1 = curLines[1];
+  if (l1) {
+    $('evalLine').textContent = l1.scoreText;
+    $('evalNum').textContent = l1.scoreText;
+    $('pv').textContent = l1.pvSan || '';
+    bestUci = l1.firstUci;
+    const clamped = Math.max(-1000, Math.min(1000, l1.cp));
+    $('evalFill').style.height = (50 + clamped / 1000 * 50) + '%';
+  }
+  showCandidates();
+  drawArrows();
+}
+function showCandidates() {
+  const box = $('cands');
+  box.innerHTML = '';
+  const idxs = Object.keys(curLines).map(Number).sort((a, b) => a - b);
+  for (const i of idxs) {
+    const l = curLines[i];
+    if (!l) continue;
+    const row = document.createElement('div');
+    row.className = 'cand';
+    const color = i <= ARROWS ? ARROW_COLORS[i - 1] : '#666';
+    row.innerHTML = '<span class="rank">' + i + '</span>' +
+      '<span class="swatch" style="background:' + color + '"></span>' +
+      '<span class="mv">' + (l.firstSan || '') + '</span><span class="ev">' + l.scoreText + '</span>';
+    box.appendChild(row);
+  }
 }
 function showGameOver() {
   let msg = 'Game over';
@@ -293,13 +373,13 @@ function showGameOver() {
   else if (game.in_stalemate()) msg = 'Draw - stalemate';
   else if (game.in_threefold_repetition()) msg = 'Draw - repetition';
   else if (game.insufficient_material()) msg = 'Draw - insufficient material';
-  else if (game.in_draw()) msg = 'Draw';
-  $('bestMove').textContent = msg;
+  else if (game.in_draw()) msg = 'Draw - fifty-move rule';
+  $('status').textContent = msg;
+  $('cands').innerHTML = '';
   $('pv').textContent = '';
-  $('status').textContent = '';
 }
 
-/* ---------- Rendering ---------- */
+/* ---------- Board rendering ---------- */
 function render() {
   grid.innerHTML = '';
   const ranks = orientation === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
@@ -319,19 +399,23 @@ function render() {
         const span = document.createElement('span');
         span.className = 'piece ' + piece.color;
         span.textContent = GLYPH[piece.type];
+        if (piece.color === game.turn() && !game.game_over()) {
+          span.classList.add('drag');
+          span.draggable = true;
+          span.addEventListener('dragstart', (e) => onDragStart(e, sq));
+          span.addEventListener('dragend', onDragEnd);
+        }
         cell.appendChild(span);
       }
       const dest = legalDests.find(d => d.to === sq);
-      if (dest) {
-        const dot = document.createElement('div');
-        dot.className = 'dot' + (dest.capture ? ' capture' : '');
-        cell.appendChild(dot);
-      }
-      // coordinate labels on the edges
-      if (f === files[0]) { const c = document.createElement('span'); c.className='coord rank'; c.textContent=r; cell.appendChild(c); }
-      if (r === ranks[ranks.length-1]) { const c = document.createElement('span'); c.className='coord file'; c.textContent=f; cell.appendChild(c); }
+      if (dest) { const dot = document.createElement('div'); dot.className = 'dot' + (dest.capture ? ' capture' : ''); cell.appendChild(dot); }
+
+      if (f === files[0]) { const c = document.createElement('span'); c.className = 'coord rank'; c.textContent = r; cell.appendChild(c); }
+      if (r === ranks[ranks.length - 1]) { const c = document.createElement('span'); c.className = 'coord file'; c.textContent = f; cell.appendChild(c); }
 
       cell.addEventListener('click', () => onSquareClick(sq));
+      cell.addEventListener('dragover', (e) => e.preventDefault());
+      cell.addEventListener('drop', (e) => onDrop(e, sq));
       grid.appendChild(cell);
     }
   }
@@ -349,85 +433,125 @@ function squareCenter(sq) {
 }
 function drawArrows() {
   [...arrows.querySelectorAll('line')].forEach(l => l.remove());
-  if (!bestUci || !$('showArrow').checked) return;
-  const a = squareCenter(bestUci.slice(0,2));
-  const b = squareCenter(bestUci.slice(2,4));
-  // shorten so the arrowhead sits inside the target square
-  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-  const bx = b.x - (dx/len) * 0.32, by = b.y - (dy/len) * 0.32;
-  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-  line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
-  line.setAttribute('x2', bx); line.setAttribute('y2', by);
-  line.setAttribute('stroke', '#388eff');
-  line.setAttribute('stroke-width', '0.17');
-  line.setAttribute('stroke-linecap', 'round');
-  line.setAttribute('opacity', '0.85');
-  line.setAttribute('marker-end', 'url(#ah)');
-  arrows.appendChild(line);
+  if (!$('showArrow').checked) return;
+  for (let i = ARROWS; i >= 1; i--) {     // draw best last so it sits on top
+    const l = curLines[i];
+    if (!l || !l.firstUci) continue;
+    const a = squareCenter(l.firstUci.slice(0, 2));
+    const b = squareCenter(l.firstUci.slice(2, 4));
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    const bx = b.x - (dx / len) * 0.32, by = b.y - (dy / len) * 0.32;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    line.setAttribute('x2', bx); line.setAttribute('y2', by);
+    line.setAttribute('stroke', ARROW_COLORS[i - 1]);
+    line.setAttribute('stroke-width', ARROW_WIDTH[i - 1]);
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('opacity', ARROW_OPACITY[i - 1]);
+    line.setAttribute('marker-end', 'url(#ah' + (i - 1) + ')');
+    arrows.appendChild(line);
+  }
 }
 
 function updateTurn() {
   const t = game.turn() === 'w' ? 'White' : 'Black';
-  let extra = '';
-  if (game.in_check()) extra = ' (check)';
+  let extra = game.in_check() ? ' (check)' : '';
   $('turnInfo').innerHTML = game.game_over() ? '<b>Game over</b>' : ('<b>' + t + '</b> to move' + extra);
 }
 function renderMoves() {
   const h = game.history();
   let html = '';
-  for (let i = 0; i < h.length; i += 2) {
-    html += '<span class="mv"><span class="num">' + (i/2 + 1) + '.</span>' + h[i] +
-            (h[i+1] ? ' ' + h[i+1] : '') + '</span> ';
-  }
+  for (let i = 0; i < h.length; i += 2)
+    html += '<span><span class="num">' + (i / 2 + 1) + '.</span>' + h[i] + (h[i + 1] ? ' ' + h[i + 1] : '') + '</span> ';
   const box = $('moves'); box.innerHTML = html; box.scrollTop = box.scrollHeight;
 }
 
-/* ---------- Interaction ---------- */
+/* ---------- Click interaction ---------- */
 function onSquareClick(sq) {
-  if (pendingPromo) return;
-  if (game.game_over()) return;
+  if (pendingPromo || game.game_over()) return;
   const piece = game.get(sq);
-
   if (selected) {
-    const dest = legalDests.find(d => d.to === sq);
-    if (dest) { tryMove(selected, sq); return; }
-    // clicked another own piece -> reselect; else clear
+    if (legalDests.find(d => d.to === sq)) { tryMove(selected, sq); return; }
     if (piece && piece.color === game.turn()) selectSquare(sq);
     else clearSelection();
     return;
   }
   if (piece && piece.color === game.turn()) selectSquare(sq);
 }
-
 function selectSquare(sq) {
   selected = sq;
-  legalDests = game.moves({ square: sq, verbose: true }).map(m => ({ to: m.to, capture: !!(m.flags && (m.flags.includes('c') || m.flags.includes('e'))) }));
+  legalDests = destsFor(sq);
   render();
 }
 function clearSelection() { selected = null; legalDests = []; render(); }
+function destsFor(sq) {
+  return game.moves({ square: sq, verbose: true }).map(m => ({ to: m.to, capture: !!(m.flags && (m.flags.includes('c') || m.flags.includes('e'))) }));
+}
 
+/* ---------- Drag interaction (no re-render mid-drag) ---------- */
+function onDragStart(e, sq) {
+  if (pendingPromo || game.game_over()) { e.preventDefault(); return; }
+  selected = null; legalDests = [];
+  grid.querySelectorAll('.sq.sel').forEach(c => c.classList.remove('sel'));
+  grid.querySelectorAll('.dot').forEach(d => d.remove());
+  dragFrom = sq;
+  const dests = destsFor(sq);
+  grid.querySelectorAll('.sq').forEach(c => {
+    if (c.dataset.square === sq) c.classList.add('sel');
+    const d = dests.find(x => x.to === c.dataset.square);
+    if (d) { const dot = document.createElement('div'); dot.className = 'dot' + (d.capture ? ' capture' : ''); c.appendChild(dot); }
+  });
+  e.dataTransfer.setData('text/plain', sq);
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDrop(e, sq) {
+  e.preventDefault();
+  const from = dragFrom; dragFrom = null;
+  clearDragHighlights();
+  if (from && sq && from !== sq) tryMove(from, sq);
+}
+function onDragEnd() { dragFrom = null; clearDragHighlights(); }
+function clearDragHighlights() {
+  grid.querySelectorAll('.sq.sel').forEach(c => c.classList.remove('sel'));
+  grid.querySelectorAll('.dot').forEach(d => d.remove());
+}
+
+/* ---------- Moving ---------- */
 function tryMove(from, to) {
   const moves = game.moves({ square: from, verbose: true }).filter(m => m.to === to);
-  const isPromo = moves.some(m => m.promotion);
-  if (isPromo) { pendingPromo = { from, to }; showPromo(game.turn()); return; }
+  if (!moves.length) return;
+  if (moves.some(m => m.promotion)) { pendingPromo = { from, to }; showPromo(game.turn()); return; }
   doMove({ from, to });
 }
-function doMove(moveObj) {
+function doMove(moveObj, byEngine) {
+  const fenBefore = game.fen();
+  const mover = game.turn();
   const m = game.move(moveObj);
   if (!m) return;
+
+  if (!byEngine && shouldGrade(mover)) {
+    const pre = (curEval && curEval.fen === fenBefore) ? curEval
+              : (curLines[1] && pendingFen === fenBefore)
+                ? { fen: fenBefore, whiteCp: curLines[1].cp, bestUci: curLines[1].firstUci }
+                : null;
+    pendingGrade = { fenBefore, mover, playedUci: m.from + m.to + (m.promotion || ''), pre };
+    $('gradeLast').textContent = 'Checking...';
+    $('gradeDetail').textContent = '';
+  }
+
   lastMove = { from: m.from, to: m.to };
   selected = null; legalDests = [];
   render();
   analyse();
 }
-function applyUci(uci) {
-  doMove({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci.length > 4 ? uci[4] : undefined });
+function applyUci(uci, byEngine) {
+  doMove({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci.length > 4 ? uci[4] : undefined }, byEngine);
 }
 
-/* promotion picker */
+/* ---------- Promotion picker ---------- */
 function showPromo(color) {
   const inner = $('promoInner'); inner.innerHTML = '';
-  for (const p of ['q','r','b','n']) {
+  for (const p of ['q', 'r', 'b', 'n']) {
     const s = document.createElement('span');
     s.textContent = GLYPH[p];
     s.style.color = color === 'w' ? '#5a5a5a' : '#1b1b1b';
@@ -441,24 +565,96 @@ function showPromo(color) {
   $('promo').classList.add('show');
 }
 
-/* ---------- Controls ---------- */
-$('newBtn').addEventListener('click', () => { game.reset(); lastMove = null; selected = null; legalDests = []; bestUci = null; render(); analyse(); });
-$('undoBtn').addEventListener('click', () => {
-  if (game.history().length === 0) return;
-  game.undo();
+/* ---------- Grading ---------- */
+function shouldGrade(mover) { return gradeMode === 'both' || gradeMode === mover; }
+
+function resolvePendingGrade() {
+  if (!pendingGrade) return;
+  if (curEval.fen !== game.fen()) return;            // not the post-move eval yet
+  const g = pendingGrade; pendingGrade = null;
+  if (!g.pre) { $('gradeLast').textContent = 'No eval (move a little slower)'; $('gradeDetail').textContent = ''; return; }
+
+  const afterWhiteCp = curEval.whiteCp;              // eval of resulting position
+  const moverSign = g.mover === 'w' ? 1 : -1;
+  let cpLoss = moverSign * (g.pre.whiteCp - afterWhiteCp);
+  if (cpLoss < 0) cpLoss = 0;
+  const isBest = g.playedUci === g.pre.bestUci;
+
+  const grade = classify(cpLoss, isBest);
+  $('gradeLast').textContent = grade.label;
+  $('gradeLast').style.color = grade.color;
+  const playedSan = uciToSan(g.fenBefore, g.playedUci) || g.playedUci;
+  const bestSan = uciToSan(g.fenBefore, g.pre.bestUci) || g.pre.bestUci;
+  let detail = 'You played ' + playedSan + '.';
+  if (!isBest) detail += ' Best was ' + bestSan + ' (-' + cpLoss + 'cp).';
+  $('gradeDetail').textContent = detail;
+
+  gradeStats.n++;
+  gradeStats.totalLoss += Math.min(cpLoss, 1000);
+  if (isBest) gradeStats.best++;
+  const avg = Math.round(gradeStats.totalLoss / gradeStats.n);
+  $('gradeStats').textContent = 'Graded ' + gradeStats.n + ' move' + (gradeStats.n === 1 ? '' : 's') +
+    ' · avg loss ' + avg + 'cp · best ' + gradeStats.best + ' (' + Math.round(gradeStats.best / gradeStats.n * 100) + '%)';
+}
+function classify(cpLoss, isBest) {
+  if (isBest) return { label: 'Best move!', color: '#69c267' };
+  if (cpLoss <= 10) return { label: 'Excellent', color: '#69c267' };
+  if (cpLoss <= 25) return { label: 'Great', color: '#83c25a' };
+  if (cpLoss <= 50) return { label: 'Good', color: '#b6c34f' };
+  if (cpLoss <= 100) return { label: 'Inaccuracy', color: '#e6b800' };
+  if (cpLoss <= 200) return { label: 'Mistake', color: '#e8842b' };
+  return { label: 'Blunder', color: '#e05a4f' };
+}
+function resetGrading() {
+  pendingGrade = null;
+  gradeStats = { n: 0, totalLoss: 0, best: 0 };
+  $('gradeLast').textContent = 'Make a move...';
+  $('gradeLast').style.color = '';
+  $('gradeDetail').textContent = '';
+  $('gradeStats').textContent = '';
+}
+
+/* ---------- Load / reset ---------- */
+function afterLoadOrReset() {
   const h = game.history({ verbose: true });
-  lastMove = h.length ? { from: h[h.length-1].from, to: h[h.length-1].to } : null;
-  selected = null; legalDests = []; render(); analyse();
-});
+  lastMove = h.length ? { from: h[h.length - 1].from, to: h[h.length - 1].to } : null;
+  selected = null; legalDests = []; bestUci = null; curEval = null; curLines = {};
+  resetGrading();
+  render();
+  analyse();
+}
+
+/* ---------- Controls ---------- */
+$('newBtn').addEventListener('click', () => { game.reset(); afterLoadOrReset(); });
+$('undoBtn').addEventListener('click', () => { if (game.history().length) { game.undo(); afterLoadOrReset(); } });
 $('flipBtn').addEventListener('click', () => { orientation = orientation === 'w' ? 'b' : 'w'; render(); });
-$('playBestBtn').addEventListener('click', () => { if (bestUci) applyUci(bestUci); });
+$('playBestBtn').addEventListener('click', () => { if (bestUci) applyUci(bestUci, false); });
 $('showArrow').addEventListener('change', drawArrows);
-$('thinkRange').addEventListener('input', (e) => {
-  thinkMs = parseInt(e.target.value, 10);
-  $('thinkVal').textContent = (thinkMs / 1000).toFixed(1) + 's';
+$('thinkRange').addEventListener('input', (e) => { thinkMs = parseInt(e.target.value, 10); $('thinkVal').textContent = (thinkMs / 1000).toFixed(1) + 's'; });
+$('gradeSel').addEventListener('change', (e) => {
+  gradeMode = e.target.value;
+  $('gradeBox').classList.toggle('show', gradeMode !== 'off');
+  if (gradeMode !== 'off') resetGrading();
 });
-$('engW').addEventListener('change', () => { if ($('engW').checked && game.turn() === 'w' && bestUci) applyUci(bestUci); });
-$('engB').addEventListener('change', () => { if ($('engB').checked && game.turn() === 'b' && bestUci) applyUci(bestUci); });
+$('engW').addEventListener('change', () => { if ($('engW').checked && game.turn() === 'w' && bestUci) applyUci(bestUci, true); });
+$('engB').addEventListener('change', () => { if ($('engB').checked && game.turn() === 'b' && bestUci) applyUci(bestUci, true); });
+
+$('loadFenBtn').addEventListener('click', () => {
+  const fen = $('loadInput').value.trim();
+  if (!fen) return;
+  if (game.load(fen)) { $('loadStatus').textContent = 'Position loaded.'; afterLoadOrReset(); }
+  else $('loadStatus').textContent = 'Invalid FEN.';
+});
+$('loadPgnBtn').addEventListener('click', () => {
+  const pgn = $('loadInput').value.trim();
+  if (!pgn) return;
+  if (game.load_pgn(pgn)) { $('loadStatus').textContent = 'PGN loaded (' + game.history().length + ' half-moves).'; afterLoadOrReset(); }
+  else $('loadStatus').textContent = 'Could not parse PGN.';
+});
+$('copyFenBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(game.fen()); $('loadStatus').textContent = 'FEN copied to clipboard.'; }
+  catch { $('loadInput').value = game.fen(); $('loadStatus').textContent = 'FEN placed in the box above.'; }
+});
 
 render();
 </script>
