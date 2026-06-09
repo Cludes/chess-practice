@@ -131,7 +131,7 @@
 <body>
 <div>
   <h1>Chess Practice - Best Move Trainer</h1>
-  <div class="sub">Drag or click to move both sides. The engine ranks every legal move (top three get arrows); turn on grading to score yours. Runs fully in your browser.</div>
+  <div class="sub">Drag or click to move both sides. The engine ranks the top moves (top three get arrows); turn on grading to score yours. Runs fully in your browser.</div>
 
   <div class="app">
     <div class="board-wrap">
@@ -171,6 +171,14 @@
 
       <div class="checks">
         <label><input type="checkbox" id="showArrow" checked /> Show candidate arrows</label>
+        <label>Show moves:
+          <select id="candSel">
+            <option value="3">Top 3</option>
+            <option value="5" selected>Top 5</option>
+            <option value="8">Top 8</option>
+            <option value="all">All legal</option>
+          </select>
+        </label>
         <label>Grade my moves:
           <select id="gradeSel">
             <option value="off">Off</option>
@@ -229,6 +237,7 @@ let curLines = {};             // multipv index -> info object (live)
 let bestUci = null;            // best move (multipv 1) for arrows / play-best
 let curEval = null;            // finalized analysis: {fen, whiteCp, bestUci, lines}
 
+let candidateCount = 5;        // how many ranked moves to request/show (number or 'all')
 let gradeMode = 'off';         // off | w | b | both
 let pendingGrade = null;       // {fenBefore, mover, playedUci, pre}
 let gradeStats = { n: 0, totalLoss: 0, best: 0 };
@@ -263,9 +272,10 @@ function analyse() {
   if (game.game_over()) { showGameOver(); return; }
   pendingFen = game.fen();
   $('status').textContent = 'Thinking...';
-  const legalCount = game.moves().length;     // rank every legal move this position
+  const legalCount = game.moves().length;
+  const want = candidateCount === 'all' ? MAX_MULTIPV : candidateCount;
   engine.postMessage('stop');
-  engine.postMessage('setoption name MultiPV value ' + Math.min(legalCount, MAX_MULTIPV));
+  engine.postMessage('setoption name MultiPV value ' + Math.min(legalCount, want));
   engine.postMessage('position fen ' + pendingFen);
   engine.postMessage('go movetime ' + thinkMs);
 }
@@ -630,6 +640,7 @@ $('undoBtn').addEventListener('click', () => { if (game.history().length) { game
 $('flipBtn').addEventListener('click', () => { orientation = orientation === 'w' ? 'b' : 'w'; render(); });
 $('playBestBtn').addEventListener('click', () => { if (bestUci) applyUci(bestUci, false); });
 $('showArrow').addEventListener('change', drawArrows);
+$('candSel').addEventListener('change', (e) => { candidateCount = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10); analyse(); });
 $('thinkRange').addEventListener('input', (e) => { thinkMs = parseInt(e.target.value, 10); $('thinkVal').textContent = (thinkMs / 1000).toFixed(1) + 's'; });
 $('gradeSel').addEventListener('change', (e) => {
   gradeMode = e.target.value;
