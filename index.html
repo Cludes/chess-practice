@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chess Practice - Best Move Trainer</title>
+<style>
+  :root {
+    --light: #ebecd0;
+    --dark: #739552;
+    --sel: rgba(255, 235, 59, 0.55);
+    --dest: rgba(0, 0, 0, 0.22);
+    --last: rgba(255, 235, 59, 0.30);
+    --best: rgba(56, 142, 255, 0.40);
+    --bg: #2b2b2b;
+    --panel: #363636;
+    --text: #e8e8e8;
+    --muted: #9aa0a6;
+    --accent: #5b9bff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+  }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .app { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+
+  .board-wrap { display: flex; gap: 8px; }
+  .eval-bar {
+    width: 16px; border-radius: 4px; overflow: hidden;
+    background: #111; position: relative; align-self: stretch;
+    display: flex; flex-direction: column-reverse;
+  }
+  .eval-fill { background: #f4f4f4; width: 100%; transition: height 0.25s ease; height: 50%; }
+  .eval-num {
+    position: absolute; left: 0; right: 0; text-align: center;
+    font-size: 9px; font-weight: 700; color: #111; bottom: 2px; pointer-events: none;
+  }
+
+  .board {
+    position: relative;
+    width: min(78vw, 560px);
+    height: min(78vw, 560px);
+    touch-action: manipulation;
+    user-select: none;
+  }
+  .grid { position: absolute; inset: 0; display: grid;
+    grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); }
+  .sq { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .sq.l { background: var(--light); }
+  .sq.d { background: var(--dark); }
+  .sq.sel::after { content: ""; position: absolute; inset: 0; background: var(--sel); }
+  .sq.last::after { content: ""; position: absolute; inset: 0; background: var(--last); }
+  .sq.best::after { content: ""; position: absolute; inset: 0; background: var(--best); }
+  .piece {
+    font-size: min(9vw, 64px); line-height: 1; z-index: 2; pointer-events: none;
+  }
+  .piece.w { color: #fff; text-shadow: 0 0 2px #000, 0 1px 2px rgba(0,0,0,.6); }
+  .piece.b { color: #1b1b1b; text-shadow: 0 0 1px rgba(255,255,255,.25); }
+  .dot { position: absolute; width: 28%; height: 28%; border-radius: 50%;
+    background: var(--dest); z-index: 1; }
+  .dot.capture { width: 86%; height: 86%; background: transparent;
+    border: 6px solid var(--dest); border-radius: 50%; }
+  .coord { position: absolute; font-size: 10px; font-weight: 700; opacity: .65; z-index: 3; }
+  .coord.file { bottom: 1px; right: 3px; }
+  .coord.rank { top: 1px; left: 3px; }
+  svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+
+  .panel { background: var(--panel); border-radius: 10px; padding: 14px 16px;
+    width: 300px; max-width: 90vw; }
+  .evalline { font-size: 28px; font-weight: 800; margin: 0 0 2px; }
+  .bestmove { font-size: 15px; color: var(--accent); font-weight: 700; min-height: 20px; }
+  .pv { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+    color: var(--muted); margin: 8px 0 0; line-height: 1.5; word-spacing: 2px; }
+  .status { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+  .turn { font-size: 13px; margin-top: 10px; }
+  .turn b { color: #fff; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  button {
+    background: #4a4a4a; color: var(--text); border: 1px solid #5a5a5a;
+    border-radius: 6px; padding: 7px 11px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: #565656; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #06203f; font-weight: 700; }
+  .opt { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 10px; color: var(--muted); }
+  .opt input[type=range] { flex: 1; }
+  .checks { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 12px; }
+  .checks label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+
+  .moves { margin-top: 12px; max-height: 150px; overflow-y: auto; font-size: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; line-height: 1.7; color: #cfd2d6; }
+  .moves .mv { cursor: default; }
+  .moves .num { color: var(--muted); margin-right: 4px; }
+
+  /* promotion picker */
+  .promo { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 10;
+    display: none; align-items: center; justify-content: center; }
+  .promo.show { display: flex; }
+  .promo-inner { background: #fff; border-radius: 10px; padding: 10px; display: flex; gap: 6px; }
+  .promo-inner span { font-size: 44px; cursor: pointer; color: #1b1b1b; line-height: 1; }
+  .promo-inner span:hover { transform: scale(1.12); }
+</style>
+</head>
+<body>
+<div>
+  <h1>Chess Practice - Best Move Trainer</h1>
+  <div class="sub">Make moves for both sides. After every move the engine shows the best reply. Runs fully in your browser.</div>
+
+  <div class="app">
+    <div class="board-wrap">
+      <div class="eval-bar"><div class="eval-fill" id="evalFill"></div><div class="eval-num" id="evalNum">0.0</div></div>
+      <div class="board" id="board">
+        <div class="grid" id="grid"></div>
+        <svg class="arrows" id="arrows" viewBox="0 0 8 8" preserveAspectRatio="none">
+          <defs>
+            <marker id="ah" markerWidth="3.2" markerHeight="3.2" refX="1.6" refY="1.6" orient="auto">
+              <path d="M0,0 L3.2,1.6 L0,3.2 L1,1.6 Z" fill="#388eff"></path>
+            </marker>
+          </defs>
+        </svg>
+        <div class="promo" id="promo"><div class="promo-inner" id="promoInner"></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="evalline" id="evalLine">0.0</div>
+      <div class="bestmove" id="bestMove">Engine starting...</div>
+      <div class="pv" id="pv"></div>
+      <div class="turn" id="turnInfo">White to move</div>
+      <div class="status" id="status"></div>
+
+      <div class="opt">
+        <span>Think</span>
+        <input type="range" id="thinkRange" min="200" max="3000" step="100" value="1000" />
+        <span id="thinkVal">1.0s</span>
+      </div>
+
+      <div class="checks">
+        <label><input type="checkbox" id="showArrow" checked /> Show best-move arrow</label>
+        <label><input type="checkbox" id="engW" /> Engine plays White</label>
+        <label><input type="checkbox" id="engB" /> Engine plays Black</label>
+      </div>
+
+      <div class="controls">
+        <button class="primary" id="newBtn">New game</button>
+        <button id="undoBtn">Undo</button>
+        <button id="flipBtn">Flip</button>
+        <button id="playBestBtn">Play best</button>
+      </div>
+
+      <div class="moves" id="moves"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { Chess } from './vendor/chess.js';
+
+const FILES = ['a','b','c','d','e','f','g','h'];
+const GLYPH = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛', k:'♚' };
+
+const game = new Chess();
+let orientation = 'w';     // side at the bottom
+let selected = null;       // selected square e.g. 'e2'
+let legalDests = [];       // [{to, capture}]
+let lastMove = null;       // {from,to}
+let bestUci = null;        // best move in uci for arrow
+let pendingFen = null;     // fen we last asked the engine to analyse
+let pendingPromo = null;   // {from,to} awaiting promotion choice
+
+const $ = id => document.getElementById(id);
+const grid = $('grid'), arrows = $('arrows');
+
+/* ---------- Engine ---------- */
+const engine = new Worker('./engine/stockfish.js');
+let engineReady = false;
+let thinkMs = 1000;
+
+engine.onmessage = (e) => {
+  const line = typeof e.data === 'string' ? e.data : (e.data && e.data.data) || '';
+  if (line === 'uciok') { engine.postMessage('isready'); return; }
+  if (line === 'readyok') { engineReady = true; analyse(); return; }
+
+  if (line.startsWith('info') && line.includes(' pv ')) {
+    const info = parseInfo(line);
+    if (info) showEval(info.scoreText, info.cp, info.pvSan, info.firstUci, false);
+    return;
+  }
+  if (line.startsWith('bestmove')) {
+    const uci = line.split(' ')[1];
+    onBestMove(uci);
+  }
+};
+engine.postMessage('uci');
+
+function analyse() {
+  if (!engineReady) return;
+  bestUci = null;
+  drawArrows();
+  if (game.game_over()) { showGameOver(); return; }
+  pendingFen = game.fen();
+  $('status').textContent = 'Thinking...';
+  engine.postMessage('stop');
+  engine.postMessage('position fen ' + pendingFen);
+  engine.postMessage('go movetime ' + thinkMs);
+}
+
+function onBestMove(uci) {
+  // ignore a result for a position we have already moved on from
+  if (pendingFen !== game.fen()) return;
+  $('status').textContent = '';
+  if (!uci || uci === '(none)') return;
+  bestUci = uci;
+  const san = uciToSan(game.fen(), uci);
+  $('bestMove').textContent = san ? ('Best: ' + san) : '';
+  drawArrows();
+
+  // optional: let the engine play this side
+  const turn = game.turn();
+  if ((turn === 'w' && $('engW').checked) || (turn === 'b' && $('engB').checked)) {
+    applyUci(uci);
+  }
+}
+
+function parseInfo(line) {
+  const t = line.split(/\s+/);
+  let cp = null, mate = null, pvIdx = t.indexOf('pv');
+  const si = t.indexOf('score');
+  if (si !== -1) {
+    if (t[si+1] === 'cp') cp = parseInt(t[si+2], 10);
+    else if (t[si+1] === 'mate') mate = parseInt(t[si+2], 10);
+  }
+  if (pvIdx === -1) return null;
+  const pvUci = t.slice(pvIdx + 1);
+  // score is from side-to-move perspective -> convert to White's perspective
+  const sign = game.turn() === 'w' ? 1 : -1;
+  let scoreText, whiteCp;
+  if (mate !== null) {
+    const m = sign * mate;
+    scoreText = (m > 0 ? '+' : '-') + 'M' + Math.abs(mate);
+    whiteCp = m > 0 ? 100000 : -100000;
+  } else {
+    whiteCp = sign * cp;
+    scoreText = (whiteCp >= 0 ? '+' : '') + (whiteCp / 100).toFixed(2);
+  }
+  return { cp: whiteCp, scoreText, pvSan: pvToSan(game.fen(), pvUci, 8), firstUci: pvUci[0] };
+}
+
+/* ---------- Conversions (uci <-> san) ---------- */
+function applyUciOn(tmp, uci) {
+  return tmp.move({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci.length > 4 ? uci[4] : undefined });
+}
+function uciToSan(fen, uci) {
+  const tmp = new Chess(fen);
+  const m = applyUciOn(tmp, uci);
+  return m ? m.san : null;
+}
+function pvToSan(fen, pvUci, max) {
+  const tmp = new Chess(fen);
+  const out = [];
+  let moveNum = parseInt(fen.split(' ')[5], 10);
+  let white = tmp.turn() === 'w';
+  for (let i = 0; i < pvUci.length && i < max; i++) {
+    const m = applyUciOn(tmp, pvUci[i]);
+    if (!m) break;
+    if (white) out.push(moveNum + '.' + m.san);
+    else { out.push(m.san); moveNum++; }
+    white = !white;
+  }
+  return out.join(' ');
+}
+
+/* ---------- Eval display ---------- */
+function showEval(scoreText, whiteCp, pvSan, firstUci, isFinal) {
+  $('evalLine').textContent = scoreText;
+  $('evalNum').textContent = scoreText;
+  $('pv').textContent = pvSan || '';
+  const clamped = Math.max(-1000, Math.min(1000, whiteCp));
+  const pct = 50 + (clamped / 1000) * 50;
+  $('evalFill').style.height = pct + '%';
+}
+function showGameOver() {
+  let msg = 'Game over';
+  if (game.in_checkmate()) msg = (game.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate';
+  else if (game.in_stalemate()) msg = 'Draw - stalemate';
+  else if (game.in_threefold_repetition()) msg = 'Draw - repetition';
+  else if (game.insufficient_material()) msg = 'Draw - insufficient material';
+  else if (game.in_draw()) msg = 'Draw';
+  $('bestMove').textContent = msg;
+  $('pv').textContent = '';
+  $('status').textContent = '';
+}
+
+/* ---------- Rendering ---------- */
+function render() {
+  grid.innerHTML = '';
+  const ranks = orientation === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
+  const files = orientation === 'w' ? FILES : [...FILES].reverse();
+  for (const r of ranks) {
+    for (const f of files) {
+      const sq = f + r;
+      const light = (FILES.indexOf(f) + r) % 2 === 1;
+      const cell = document.createElement('div');
+      cell.className = 'sq ' + (light ? 'l' : 'd');
+      cell.dataset.square = sq;
+      if (selected === sq) cell.classList.add('sel');
+      if (lastMove && (lastMove.from === sq || lastMove.to === sq)) cell.classList.add('last');
+
+      const piece = game.get(sq);
+      if (piece) {
+        const span = document.createElement('span');
+        span.className = 'piece ' + piece.color;
+        span.textContent = GLYPH[piece.type];
+        cell.appendChild(span);
+      }
+      const dest = legalDests.find(d => d.to === sq);
+      if (dest) {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (dest.capture ? ' capture' : '');
+        cell.appendChild(dot);
+      }
+      // coordinate labels on the edges
+      if (f === files[0]) { const c = document.createElement('span'); c.className='coord rank'; c.textContent=r; cell.appendChild(c); }
+      if (r === ranks[ranks.length-1]) { const c = document.createElement('span'); c.className='coord file'; c.textContent=f; cell.appendChild(c); }
+
+      cell.addEventListener('click', () => onSquareClick(sq));
+      grid.appendChild(cell);
+    }
+  }
+  updateTurn();
+  renderMoves();
+  drawArrows();
+}
+
+function squareCenter(sq) {
+  const fi = FILES.indexOf(sq[0]);
+  const ri = parseInt(sq[1], 10) - 1;
+  const x = orientation === 'w' ? fi + 0.5 : (7 - fi) + 0.5;
+  const y = orientation === 'w' ? (7 - ri) + 0.5 : ri + 0.5;
+  return { x, y };
+}
+function drawArrows() {
+  [...arrows.querySelectorAll('line')].forEach(l => l.remove());
+  if (!bestUci || !$('showArrow').checked) return;
+  const a = squareCenter(bestUci.slice(0,2));
+  const b = squareCenter(bestUci.slice(2,4));
+  // shorten so the arrowhead sits inside the target square
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const bx = b.x - (dx/len) * 0.32, by = b.y - (dy/len) * 0.32;
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+  line.setAttribute('x2', bx); line.setAttribute('y2', by);
+  line.setAttribute('stroke', '#388eff');
+  line.setAttribute('stroke-width', '0.17');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('opacity', '0.85');
+  line.setAttribute('marker-end', 'url(#ah)');
+  arrows.appendChild(line);
+}
+
+function updateTurn() {
+  const t = game.turn() === 'w' ? 'White' : 'Black';
+  let extra = '';
+  if (game.in_check()) extra = ' (check)';
+  $('turnInfo').innerHTML = game.game_over() ? '<b>Game over</b>' : ('<b>' + t + '</b> to move' + extra);
+}
+function renderMoves() {
+  const h = game.history();
+  let html = '';
+  for (let i = 0; i < h.length; i += 2) {
+    html += '<span class="mv"><span class="num">' + (i/2 + 1) + '.</span>' + h[i] +
+            (h[i+1] ? ' ' + h[i+1] : '') + '</span> ';
+  }
+  const box = $('moves'); box.innerHTML = html; box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- Interaction ---------- */
+function onSquareClick(sq) {
+  if (pendingPromo) return;
+  if (game.game_over()) return;
+  const piece = game.get(sq);
+
+  if (selected) {
+    const dest = legalDests.find(d => d.to === sq);
+    if (dest) { tryMove(selected, sq); return; }
+    // clicked another own piece -> reselect; else clear
+    if (piece && piece.color === game.turn()) selectSquare(sq);
+    else clearSelection();
+    return;
+  }
+  if (piece && piece.color === game.turn()) selectSquare(sq);
+}
+
+function selectSquare(sq) {
+  selected = sq;
+  legalDests = game.moves({ square: sq, verbose: true }).map(m => ({ to: m.to, capture: !!(m.flags && (m.flags.includes('c') || m.flags.includes('e'))) }));
+  render();
+}
+function clearSelection() { selected = null; legalDests = []; render(); }
+
+function tryMove(from, to) {
+  const moves = game.moves({ square: from, verbose: true }).filter(m => m.to === to);
+  const isPromo = moves.some(m => m.promotion);
+  if (isPromo) { pendingPromo = { from, to }; showPromo(game.turn()); return; }
+  doMove({ from, to });
+}
+function doMove(moveObj) {
+  const m = game.move(moveObj);
+  if (!m) return;
+  lastMove = { from: m.from, to: m.to };
+  selected = null; legalDests = [];
+  render();
+  analyse();
+}
+function applyUci(uci) {
+  doMove({ from: uci.slice(0,2), to: uci.slice(2,4), promotion: uci.length > 4 ? uci[4] : undefined });
+}
+
+/* promotion picker */
+function showPromo(color) {
+  const inner = $('promoInner'); inner.innerHTML = '';
+  for (const p of ['q','r','b','n']) {
+    const s = document.createElement('span');
+    s.textContent = GLYPH[p];
+    s.style.color = color === 'w' ? '#5a5a5a' : '#1b1b1b';
+    s.addEventListener('click', () => {
+      const mv = { ...pendingPromo, promotion: p };
+      pendingPromo = null; $('promo').classList.remove('show');
+      doMove(mv);
+    });
+    inner.appendChild(s);
+  }
+  $('promo').classList.add('show');
+}
+
+/* ---------- Controls ---------- */
+$('newBtn').addEventListener('click', () => { game.reset(); lastMove = null; selected = null; legalDests = []; bestUci = null; render(); analyse(); });
+$('undoBtn').addEventListener('click', () => {
+  if (game.history().length === 0) return;
+  game.undo();
+  const h = game.history({ verbose: true });
+  lastMove = h.length ? { from: h[h.length-1].from, to: h[h.length-1].to } : null;
+  selected = null; legalDests = []; render(); analyse();
+});
+$('flipBtn').addEventListener('click', () => { orientation = orientation === 'w' ? 'b' : 'w'; render(); });
+$('playBestBtn').addEventListener('click', () => { if (bestUci) applyUci(bestUci); });
+$('showArrow').addEventListener('change', drawArrows);
+$('thinkRange').addEventListener('input', (e) => {
+  thinkMs = parseInt(e.target.value, 10);
+  $('thinkVal').textContent = (thinkMs / 1000).toFixed(1) + 's';
+});
+$('engW').addEventListener('change', () => { if ($('engW').checked && game.turn() === 'w' && bestUci) applyUci(bestUci); });
+$('engB').addEventListener('change', () => { if ($('engB').checked && game.turn() === 'b' && bestUci) applyUci(bestUci); });
+
+render();
+</script>
+</body>
+</html>
