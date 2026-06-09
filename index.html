@@ -159,7 +159,7 @@
 <body>
 <div>
   <h1>Chess Practice - Best Move Trainer</h1>
-  <div class="sub">Drag or click to move both sides. The engine ranks the top moves (top three get arrows) - click a move to play it. Step through the game with the arrow keys, or turn on grading to score yourself. Runs fully in your browser.</div>
+  <div class="sub">Drag or click to move. Play a bot at an adjustable level (tick "Bot plays..."), with full-strength hints on the side. The engine ranks the top moves (top three get arrows) - click a move to play it. Step through the game with the arrow keys, or turn on grading to score yourself. Runs fully in your browser.</div>
 
   <div class="app">
     <div class="board-col">
@@ -227,9 +227,16 @@
             <option value="both">Both</option>
           </select>
         </label>
-        <label><input type="checkbox" id="engW" /> Engine plays White</label>
-        <label><input type="checkbox" id="engB" /> Engine plays Black</label>
+        <label><input type="checkbox" id="engW" /> Bot plays White</label>
+        <label><input type="checkbox" id="engB" /> Bot plays Black</label>
       </div>
+
+      <div class="opt">
+        <span>Bot level</span>
+        <input type="range" id="botRange" min="1" max="10" step="1" value="6" />
+        <span id="botVal">6 / 10</span>
+      </div>
+      <div class="depth" style="margin-top:2px">Bot strength only affects the bot's own moves; your hints stay full strength.</div>
 
       <div class="controls">
         <button class="primary" id="newBtn">New game</button>
@@ -309,6 +316,69 @@ engine.onmessage = (e) => {
 };
 engine.postMessage('uci');
 
+/* ---------- Bot engine (separate worker, strength-limited) ---------- */
+const bot = new Worker('./engine/stockfish.js');
+let botReady = false;
+let botLevel = 6;              // 1 (weak) .. 10 (full strength)
+let botLines = {};
+let botPendingFen = null;
+const BOT_MS = 500;
+
+bot.onmessage = (e) => {
+  const line = typeof e.data === 'string' ? e.data : (e.data && e.data.data) || '';
+  if (line === 'uciok') { bot.postMessage('isready'); return; }
+  if (line === 'readyok') { botReady = true; return; }
+  if (line.startsWith('info') && line.includes(' pv ')) {
+    const t = line.split(/\s+/);
+    const mpv = t.indexOf('multipv') !== -1 ? parseInt(t[t.indexOf('multipv') + 1], 10) : 1;
+    const firstUci = t[t.indexOf('pv') + 1];
+    let cp = 0;
+    const si = t.indexOf('score');
+    if (si !== -1) {
+      if (t[si + 1] === 'cp') cp = parseInt(t[si + 2], 10);
+      else if (t[si + 1] === 'mate') { const m = parseInt(t[si + 2], 10); cp = m > 0 ? 100000 - Math.abs(m) : -100000 + Math.abs(m); }
+    }
+    botLines[mpv] = { firstUci, cp };   // cp from the bot's (side-to-move) perspective
+    return;
+  }
+  if (line.startsWith('bestmove')) onBotBestMove();
+};
+bot.postMessage('uci');
+
+function maybeBotMove() {
+  if (!botReady || game.game_over() || future.length) return;
+  const turn = game.turn();
+  if (!((turn === 'w' && $('engW').checked) || (turn === 'b' && $('engB').checked))) return;
+  botLines = {};
+  botPendingFen = game.fen();
+  const lines = Math.min(game.moves().length, Math.max(1, 5 + (10 - botLevel)));   // weaker => more options to choose worse from
+  bot.postMessage('stop');
+  bot.postMessage('setoption name MultiPV value ' + lines);
+  bot.postMessage('position fen ' + botPendingFen);
+  bot.postMessage('go movetime ' + BOT_MS);
+}
+function onBotBestMove() {
+  if (game.game_over() || future.length || botPendingFen !== game.fen() || !botLines[1]) return;
+  const turn = game.turn();
+  if (!((turn === 'w' && $('engW').checked) || (turn === 'b' && $('engB').checked))) return;
+  const uci = selectBotMove();
+  if (uci) applyUci(uci, true);
+}
+function selectBotMove() {
+  const arr = Object.keys(botLines).map(k => botLines[k]);
+  if (!arr.length) return null;
+  const best = Math.max(...arr.map(l => l.cp));
+  const maxLoss = (10 - botLevel) * 80;          // centipawns it is willing to give up
+  const temp = 20 + (10 - botLevel) * 50;        // higher => more random among eligible
+  const pool = arr.filter(l => best - l.cp <= maxLoss);
+  const use = pool.length ? pool : arr;
+  const weights = use.map(l => Math.exp(-(best - l.cp) / temp));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < use.length; i++) { r -= weights[i]; if (r <= 0) return use[i].firstUci; }
+  return use[0].firstUci;
+}
+
 function analyse() {
   if (!engineReady) return;
   curLines = {};
@@ -334,12 +404,6 @@ function onBestMove(uci) {
   if (l1) $('depth').textContent = 'Depth ' + l1.depth;
   refreshAnalysisUI();
   resolvePendingGrade();
-
-  const turn = game.turn();
-  if (bestUci && future.length === 0 &&
-      ((turn === 'w' && $('engW').checked) || (turn === 'b' && $('engB').checked))) {
-    setTimeout(() => applyUci(bestUci, true), 250);
-  }
 }
 
 function parseInfo(line) {
@@ -652,6 +716,7 @@ function doMove(moveObj, byEngine) {
   selected = null; legalDests = []; hoverUci = null;
   render();
   analyse();
+  maybeBotMove();
 }
 function applyUci(uci, byEngine) {
   if (game.game_over()) return;
@@ -665,6 +730,7 @@ function afterNav() {
   selected = null; legalDests = []; hoverUci = null; pendingGrade = null;
   render();
   analyse();
+  maybeBotMove();
 }
 function goBack() { if (game.history().length) { future.push(game.undo()); afterNav(); } }
 function goForward() { if (future.length) { game.move(future.pop()); afterNav(); } }
@@ -757,7 +823,7 @@ function playMoveSound(m) {
 /* ---------- Settings persistence ---------- */
 function saveSettings() {
   localStorage.setItem(SKEY, JSON.stringify({
-    thinkMs, candidateCount, gradeMode, soundOn,
+    thinkMs, candidateCount, gradeMode, soundOn, botLevel,
     showArrow: $('showArrow').checked
   }));
 }
@@ -769,6 +835,7 @@ function loadSettings() {
   if (s.candidateCount !== undefined) { candidateCount = s.candidateCount; $('candSel').value = String(s.candidateCount); }
   if (s.gradeMode) { gradeMode = s.gradeMode; $('gradeSel').value = s.gradeMode; $('gradeBox').classList.toggle('show', gradeMode !== 'off'); }
   if (s.soundOn !== undefined) { soundOn = s.soundOn; $('soundChk').checked = s.soundOn; }
+  if (s.botLevel) { botLevel = s.botLevel; $('botRange').value = botLevel; $('botVal').textContent = botLevel + ' / 10' + (botLevel === 10 ? ' (max)' : ''); }
   if (s.showArrow !== undefined) $('showArrow').checked = s.showArrow;
 }
 
@@ -789,8 +856,9 @@ $('soundChk').addEventListener('change', (e) => { soundOn = e.target.checked; sa
 $('thinkRange').addEventListener('input', (e) => { thinkMs = parseInt(e.target.value, 10); $('thinkVal').textContent = (thinkMs / 1000).toFixed(1) + 's'; saveSettings(); });
 $('candSel').addEventListener('change', (e) => { candidateCount = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10); saveSettings(); analyse(); });
 $('gradeSel').addEventListener('change', (e) => { gradeMode = e.target.value; $('gradeBox').classList.toggle('show', gradeMode !== 'off'); if (gradeMode !== 'off') resetGrading(); saveSettings(); });
-$('engW').addEventListener('change', () => { if ($('engW').checked && game.turn() === 'w' && bestUci && future.length === 0) applyUci(bestUci, true); });
-$('engB').addEventListener('change', () => { if ($('engB').checked && game.turn() === 'b' && bestUci && future.length === 0) applyUci(bestUci, true); });
+$('engW').addEventListener('change', maybeBotMove);
+$('engB').addEventListener('change', maybeBotMove);
+$('botRange').addEventListener('input', (e) => { botLevel = parseInt(e.target.value, 10); $('botVal').textContent = botLevel + ' / 10' + (botLevel === 10 ? ' (max)' : ''); saveSettings(); });
 
 $('loadFenBtn').addEventListener('click', () => {
   const fen = $('loadInput').value.trim(); if (!fen) return;
